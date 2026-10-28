@@ -25,8 +25,15 @@ module ActiveRecordReplica
       return
     end
 
-    # When the DBMS is not available, an exception (e.g. PG::ConnectionBad) is raised
-    active_db_connection = ActiveRecord::Base.connection.active? rescue false
+    # Rails 7.2 adapters connect lazily; active? alone is false before the first query.
+    # Preserve the unavailable-database guard after verifying the primary connection.
+    active_db_connection = begin
+      connection = ActiveRecord::Base.connection
+      connection.verify!
+      connection.active?
+    rescue StandardError
+      false
+    end
     unless active_db_connection
       ActiveRecord::Base.logger.info("ActiveRecord not connected so not installing ActiveRecordReplica")
       return

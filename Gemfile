@@ -2,14 +2,9 @@ source 'https://rubygems.org'
 
 gemspec
 
-gem 'rake'
-gem 'minitest'
-gem 'awesome_print'
+gem 'rake', '~> 13.0'
+gem 'minitest', '~> 5.0'
+gem 'mysql2', '~> 0.5.3'
 
-gem 'sqlite3', '~> 1.3.0', platform: :ruby
-gem 'jdbc-sqlite3', platform: :jruby
-gem 'activerecord-jdbcsqlite3-adapter', platform: :jruby
-gem 'appraisal'
-
-gem 'activerecord', '~> 5.2.0'
+gem 'activerecord', ENV.fetch('ACTIVE_RECORD_VERSION', '~> 7.2.0')
 
