@@ -22,10 +22,4 @@ Rake::TestTask.new(:test) do |t|
   t.warning = false
 end
 
-# By default run tests against all appraisals
-if !ENV["APPRAISAL_INITIALIZED"] && !ENV["TRAVIS"]
-  require 'appraisal'
-  task default: :appraisal
-else
-  task default: :test
-end
+task default: :test

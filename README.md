@@ -1,6 +1,6 @@
 # Active Record Replica
 [![Gem Version](https://img.shields.io/gem/v/active_record_replica.svg)](https://rubygems.org/gems/active_record_replica)
-[![Build Status](https://travis-ci.org/teespring/active_record_replica.svg?branch=master)](https://travis-ci.org/teespring/active_record_replica)
+[![MySQL tests](https://github.com/nCino/active_record_replica/actions/workflows/test.yml/badge.svg?branch=sn/rails7)](https://github.com/nCino/active_record_replica/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-brightgreen.svg)](http://opensource.org/licenses/Apache-2.0)
 ![](https://img.shields.io/badge/status-Production%20Ready-blue.svg)
 
@@ -26,9 +26,8 @@ Production Ready. Actively used in large production environments.
 
 * Redirecting reads to a single replica database.
 * Works with any database driver that works with ActiveRecord.
-* Supports all Rails 3, 4, or 5 read apis.
-    * Including dynamic finders, AREL, and ActiveRecord::Base.select.
-    * **NOTE**: In Rails 3 and 4, QueryCache is only enabled for BaseConnection by default. In Rails 5, it's enabled for all connections. [(PR)](https://github.com/rails/rails/pull/28869)
+* Supports Active Record 6.1, 7.0, 7.1, and 7.2, tested with MySQL on Ruby 3.1.6.
+    * Including model queries, AREL, direct select APIs, and `load_async` on Active Record 7.0+.
 * Transaction aware
     * Detects when a query is inside of a transaction and sends those reads to the primary by default.
     * Can be configured to send reads in a transaction to replica databases.
@@ -237,7 +236,7 @@ gem install active_record_replica
 
 ## Configuration
 
-To enable replica reads for any environment just add a _replica:_ entry to database.yml
+To enable replica reads for any environment just add a `reader:` entry to database.yml
 along with all the usual ActiveRecord database configuration options.
 
 For Example:
@@ -248,15 +247,15 @@ production:
   username: username
   password: password
   encoding: utf8
-  adapter:  mysql
+  adapter:  mysql2
   host:     primary1
   pool:     50
-  replica:
+  reader:
     database: production
     username: username
     password: password
     encoding: utf8
-    adapter:  mysql
+    adapter:  mysql2
     host:     replica1
     pool:     50
 ```
@@ -270,16 +269,16 @@ production:
   username: username
   password: password
   encoding: utf8
-  adapter:  mysql
+  adapter:  mysql2
   host:     primary1
   pool:     50
 <% if `hostname`.strip == 'batch' %>
-  replica:
+  reader:
     database: production
     username: username
     password: password
     encoding: utf8
-    adapter:  mysql
+    adapter:  mysql2
     host:     replica1
     pool:     50
 <% end %>
@@ -294,15 +293,15 @@ production:
   username: username
   password: password
   encoding: utf8
-  adapter:  mysql
+  adapter:  mysql2
   host:     primary1
   pool:     50
-  replica:
+  reader:
     database: production
     username: username
     password: password
     encoding: utf8
-    adapter:  mysql
+    adapter:  mysql2
     host:     <%= %w(replica1 replica2 replica3).sample %>
     pool:     50
 ```
@@ -315,15 +314,15 @@ production:
   username: username
   password: password
   encoding: utf8
-  adapter:  mysql
+  adapter:  mysql2
   host:     primary1
   pool:     50
-  replica:
+  reader:
     database: production
     username: username
     password: password
     encoding: utf8
-    adapter:  mysql
+    adapter:  mysql2
     host:     <%= `hostname`.strip == 'app1' ? 'replica1' : 'replica2' %>
     pool:     50
 ```
@@ -348,7 +347,41 @@ end
 
 ## Dependencies
 
-See [.travis.yml](https://github.com/reidmorrison/active_record_replica/blob/master/.travis.yml) for the list of tested Ruby platforms
+Active Record must be `>= 6.1, < 7.3`. The upper bound follows the tested versions in
+[GitHub Actions](.github/workflows/test.yml); add a passing matrix job before widening it.
+
+## Running tests
+
+Use Ruby 3.1.6 and a running MySQL server. The suite creates two databases and recreates
+their `users` tables. These databases intentionally do not replicate: different marker
+rows prove which connection executes each read. Every test uses the adapter installed
+by `ActiveRecordReplica.install!` with a `reader:` configuration.
+
+```sh
+export ACTIVE_RECORD_VERSION="~> 7.2.0"
+export MYSQL_HOST=127.0.0.1
+export MYSQL_PORT=3306
+export MYSQL_USER=root
+export MYSQL_PASSWORD=
+bundle install
+bundle exec rake test
+```
+
+The user needs permission to create the test databases, or they must already exist.
+Their default names are `active_record_replica_test_primary` and
+`active_record_replica_test_reader`; override them with `MYSQL_PRIMARY_DATABASE` and
+`MYSQL_REPLICA_DATABASE`. Use dedicated test databases because their tables are reset.
+Change `ACTIVE_RECORD_VERSION` to `~> 6.1.0`, `~> 7.0.0`, or `~> 7.1.0` and repeat
+`bundle install` to run another matrix version. Rails 6.1 has no `load_async`; that
+coverage runs on the other three versions. Failure logs are written to `test.log`.
+
+## Fork releases
+
+The monolith consumes this nCino fork through git. After the MySQL matrix passes and
+the changes are reviewed, tag the reviewed commit and push that tag explicitly.
+Do not use `rake publish`, which also pushes unrelated tags and publishes to RubyGems.
+Keep existing tags immutable. Other applications may track `sn/rails7`, so check
+its consumers before merging changes into that branch.
 
 ## Versioning
 

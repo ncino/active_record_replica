@@ -1,0 +1,56 @@
+name: MySQL tests
+
+on:
+  pull_request:
+  push:
+    branches: [master, sn/rails7, 'cbunch/BEG-208-*']
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Active Record ${{ matrix.active_record }} / Ruby 3.1.6
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        active_record: ['~> 6.1.0', '~> 7.0.0', '~> 7.1.0', '~> 7.2.0']
+    env:
+      ACTIVE_RECORD_VERSION: ${{ matrix.active_record }}
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_USER: root
+      MYSQL_PASSWORD: test
+    services:
+      mysql:
+        image: mysql:8.4.8
+        env:
+          MYSQL_ROOT_PASSWORD: test
+        ports: ['3306/tcp']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mysql2 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-libmysqlclient-dev
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1.6'
+          bundler-cache: true
+      - name: Report resolved dependencies
+        run: bundle exec ruby -r logger -r active_record -r mysql2 -e 'puts "Ruby #{RUBY_VERSION}, Active Record #{ActiveRecord.version}, mysql2 #{Mysql2::VERSION}"'
+      - name: Run installation and routing tests on two MySQL databases
+        env:
+          MYSQL_PORT: ${{ job.services.mysql.ports[3306] }}
+        run: bundle exec rake test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mysql-log-${{ strategy.job-index }}
+          path: test.log

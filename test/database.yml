@@ -1,12 +1,16 @@
 test:
-  adapter:  sqlite3
-  database: test/test.sqlite3
-  pool:     5
-  timeout:  5000
-  # Make the replica a separate database that is not replicated to ensure reads
-  # and writes go to the appropriate databases
+  adapter: mysql2
+  host: <%= ENV.fetch('MYSQL_HOST', '127.0.0.1').inspect %>
+  port: <%= ENV.fetch('MYSQL_PORT', '3306') %>
+  username: <%= ENV.fetch('MYSQL_USER', 'root').inspect %>
+  password: <%= ENV.fetch('MYSQL_PASSWORD', '').inspect %>
+  database: <%= ENV.fetch('MYSQL_PRIMARY_DATABASE', 'active_record_replica_test_primary').inspect %>
+  pool: 5
   reader:
-    adapter:  sqlite3
-    database: test/test_replica.sqlite3
-    pool:     5
-    timeout:  5000
+    adapter: mysql2
+    host: <%= ENV.fetch('MYSQL_HOST', '127.0.0.1').inspect %>
+    port: <%= ENV.fetch('MYSQL_PORT', '3306') %>
+    username: <%= ENV.fetch('MYSQL_USER', 'root').inspect %>
+    password: <%= ENV.fetch('MYSQL_PASSWORD', '').inspect %>
+    database: <%= ENV.fetch('MYSQL_REPLICA_DATABASE', 'active_record_replica_test_reader').inspect %>
+    pool: 5

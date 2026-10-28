@@ -3,36 +3,18 @@ module ActiveRecordReplica
   module Extensions
     extend ActiveSupport::Concern
 
-    no_keyword_args = %i[select select_one select_rows select_value select_values]
-    keyword_args = %i[select_all]
-
-    no_keyword_args.each do |select_method|
-      class_eval <<-RUBY, __FILE__, __LINE__ + 1
-        def #{select_method}(*args)
-          return super if active_record_replica_read_from_primary?
-          active_record_replica_select(:#{select_method}, *args)
-        end
-      RUBY
-    end
-
-    keyword_args.each do |select_method|
+    SELECT_METHODS.each do |select_method|
       class_eval <<-RUBY, __FILE__, __LINE__ + 1
         def #{select_method}(*args, **kwargs)
           return super if active_record_replica_read_from_primary?
-          active_record_replica_select_kargs(:#{select_method}, *args, **kwargs)
+          active_record_replica_select(:#{select_method}, *args, **kwargs)
         end
       RUBY
     end
 
-    def active_record_replica_select(select_method, sql, name = nil, *args)
+    def active_record_replica_select(select_method, sql, name = nil, *args, **kwargs)
       ActiveRecordReplica.read_from_primary do
-        reader_connection.public_send(select_method, sql, "Replica: \#{name || 'SQL'}", *args)
-      end
-    end
-
-    def active_record_replica_select_kargs(select_method, sql, name = nil, *args, **kwargs)
-      ActiveRecordReplica.read_from_primary do
-        reader_connection.public_send(select_method, sql, "Replica: \#{name || 'SQL'}", *args, **kwargs)
+        reader_connection.public_send(select_method, sql, "Replica: #{name || 'SQL'}", *args, **kwargs)
       end
     end
 
@@ -54,21 +36,21 @@ module ActiveRecordReplica
       raise(TransactionAttempted, 'Attempting to commit a transaction during a read-only database connection.')
     end
 
-    def create_savepoint(name = current_savepoint_name(true))
+    def create_savepoint(name = current_savepoint_name)
       return if ActiveRecordReplica.skip_transactions?
       return super unless ActiveRecordReplica.block_transactions?
 
       raise(TransactionAttempted, 'Attempting to create a savepoint during a read-only database connection.')
     end
 
-    def rollback_to_savepoint(name = current_savepoint_name(true))
+    def rollback_to_savepoint(name = current_savepoint_name)
       return if ActiveRecordReplica.skip_transactions?
       return super unless ActiveRecordReplica.block_transactions?
 
       raise(TransactionAttempted, 'Attempting to rollback a savepoint during a read-only database connection.')
     end
 
-    def release_savepoint(name = current_savepoint_name(true))
+    def release_savepoint(name = current_savepoint_name)
       return if ActiveRecordReplica.skip_transactions?
       return super unless ActiveRecordReplica.block_transactions?
 
