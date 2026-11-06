@@ -19,22 +19,25 @@ module ActiveRecordReplica
   #     In a non-Rails environment, supply the environment such as
   #     'development', 'production'
   def self.install!(adapter_class = nil, environment = nil)
-    replica_config =
-      if ActiveRecord::Base.connection.respond_to?(:config)
-        ActiveRecord::Base.connection.config[:replica]
-      else
-        ActiveRecord::Base.configurations[environment || Rails.env]['replica']
-      end
-    if replica_config
-      ActiveRecord::Base.logger.info "ActiveRecordReplica.install! v#{ActiveRecordReplica::VERSION} Establishing connection to replica database"
-      Replica.establish_connection(replica_config)
-
-      # Inject a new #select method into the ActiveRecord Database adapter
-      base = adapter_class || ActiveRecord::Base.connection.class
-      base.include(Extensions)
-    else
-      ActiveRecord::Base.logger.info "ActiveRecordReplica not installed since no replica database defined"
+    replica_config = ActiveRecord::Base.configurations.configs_for(env_name: environment || Rails.env)&.first&.configuration_hash&.dig(:reader)
+    unless replica_config
+      ActiveRecord::Base.logger.info("ActiveRecordReplica not installed since no replica database defined")
+      return
     end
+
+    # When the DBMS is not available, an exception (e.g. PG::ConnectionBad) is raised
+    active_db_connection = ActiveRecord::Base.connection.active? rescue false
+    unless active_db_connection
+      ActiveRecord::Base.logger.info("ActiveRecord not connected so not installing ActiveRecordReplica")
+      return
+    end
+
+    ActiveRecord::Base.logger.info "ActiveRecordReplica.install! v#{ActiveRecordReplica::VERSION} Establishing connection to replica database"
+    Replica.establish_connection(replica_config)
+
+    # Inject a new #select method into the ActiveRecord Database adapter
+    base = adapter_class || ActiveRecord::Base.connection.class
+    base.include(Extensions)
   end
 
   # Force reads for the supplied block to read from the primary database
